@@ -12,24 +12,33 @@ datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
-
 model User {
-  id       Int      @id @default(autoincrement())
-  email    String   @unique
-  password String
-  name     String   // Add the name field
-  tasks    Task[]
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String   // Name of the user
+  tasks     Task[]   // Relationship to tasks
 }
-
 model Task {
-    id          Int      @id @default(autoincrement())
-    title       String
-    description String
-    rank        Int?
-    userId      Int
-    isChecked   Boolean  @default(false) // New field for checkbox state
-    user        User     @relation(fields: [userId], references: [id])
+  id          Int       @id @default(autoincrement())
+  title       String    // Title of the task
+  description String    // Description of the task
+  rank        Int?      // Optional ranking of the task
+  userId      Int       // Foreign key to the user
+  status      String    @default("todo")  // Task status (todo, in-progress, done)
+  isChecked   Boolean   @default(false)   // Checkbox state of the task
+  dueDate     DateTime? // Optional due date for the task
+  priority    String?   // Task priority (low, medium, high)
+  completedAt DateTime? // Timestamp for when the task is completed
+  user        User      @relation(fields: [userId], references: [id])
+  subtasks    Subtask[] // Relationship with subtasks (no `onDelete` here)
 }
 
-
-
+model Subtask {
+  id          Int       @id @default(autoincrement())
+  taskId      Int       // Foreign key to the task
+  content     String    // Content of the subtask
+  isChecked   Boolean   @default(false) // Checkbox state of the subtask
+  completedAt DateTime? // Timestamp for when the subtask is completed
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade) // Add `onDelete: Cascade` here
+}

@@ -97,10 +97,137 @@
 
 
 
+// import React, { useState, useEffect } from "react";
+// import { Grid, Box } from "@mui/material";
+// import { DragDropContext } from "react-beautiful-dnd";
+// import TaskColumn from "./TaskColumn"; // Your existing column component
+// import axios from "axios";
+// import TaskCard from "./TaskCard";
+// import TaskForm from "./TaskForm";
+
+// const TaskBoard = () => {
+//   const [tasks, setTasks] = useState([]);
+//   const token = localStorage.getItem("token");
+
+//   // Fetch tasks initially
+//   useEffect(() => {
+//     axios
+//       .get("http://localhost:7000/api/tasks", { headers: { Authorization: `Bearer ${token}` } })
+//       .then((res) => setTasks(res.data))
+//       .catch((err) => console.error("Error fetching tasks:", err));
+//   }, []);
+
+//   // Safely parse the task description
+//   const safeJSONParse = (string) => {
+//     try {
+//       return JSON.parse(string);
+//     } catch (e) {
+//       console.error("Invalid JSON string:", string, e);
+//       return []; // Return an empty array for invalid JSON
+//     }
+//   };
+
+//   // Sort tasks into columns based on their completion state
+//   const sortedTasks = {
+//     todo: tasks.filter((task) => {
+//       const subtasks = safeJSONParse(task.description);
+//       return !subtasks.some((subtask) => subtask.completed);
+//     }),
+//     inProgress: tasks.filter((task) => {
+//       const subtasks = safeJSONParse(task.description);
+//       return subtasks.some((subtask) => !subtask.completed);
+//     }),
+//     done: tasks.filter((task) => {
+//       const subtasks = safeJSONParse(task.description);
+//       return subtasks.every((subtask) => subtask.completed);
+//     }),
+//   };
+
+//   // Handle drag end
+//   const handleDragEnd = async (result) => {
+//     const { destination, source } = result;
+//     if (!destination) return;
+
+//     const movedTask = tasks[source.index];
+//     const updatedTasks = [...tasks];
+//     updatedTasks.splice(source.index, 1);
+//     updatedTasks.splice(destination.index, 0, movedTask);
+//     setTasks(updatedTasks);
+
+//     // Determine the new status based on the destination column
+//     let newStatus;
+//     if (destination.droppableId === "todo") {
+//         newStatus = "todo";
+//     } else if (destination.droppableId === "inProgress") {
+//         newStatus = "inProgress";
+//     } else if (destination.droppableId === "done") {
+//         newStatus = "done";
+        
+//         // Call the new API to move the task to done
+//         try {
+//             await axios.put(`http://localhost:7000/api/tasks/${movedTask.id}/moveToDone`, {}, {
+//                 headers: { Authorization: `Bearer ${token}` },
+//             });
+//         } catch (error) {
+//             console.error("Error moving task to done:", error);
+//         }
+//     }
+
+//     // Update the task status in the backend for other columns
+//     if (newStatus && newStatus !== "done") {
+//         try {
+//             await axios.put(`http://localhost:7000/api/updatetasks/${movedTask.id}`, {
+//                 title: movedTask.title,
+//                 description: movedTask.description,
+//                 status: newStatus,
+//             }, {
+//                 headers: { Authorization: `Bearer ${token}` },
+//             });
+//         } catch (error) {
+//             console.error("Error updating task status:", error);
+//         }
+//     }
+// };
+
+//   return (
+//     <DragDropContext onDragEnd={handleDragEnd}>
+//           <TaskForm
+//         // newTopic={newTopic}
+//         // setNewTopic={setNewTopic}
+//         // newSubtasks={newSubtasks}
+//         // setNewSubtasks={setNewSubtasks}
+//         // addTask={addTask}
+//       />
+//       <Grid container spacing={3}>
+//         <TaskColumn
+//           columnId="todo"
+//           columnTitle="To Do"
+//           tasks={sortedTasks.todo}
+//           renderTask={(task) => <TaskCard task={task} />}
+//         />
+//         <TaskColumn
+//           columnId="inProgress"
+//           columnTitle="In Progress"
+//           tasks={sortedTasks.inProgress}
+//           renderTask={(task) => <TaskCard task={task} />}
+//         />
+//         <TaskColumn
+//           columnId="done"
+//           columnTitle="Done"
+//           tasks={sortedTasks.done}
+//           renderTask={(task) => <TaskCard task={task} />}
+//         />
+//       </Grid>
+//     </DragDropContext>
+//   );
+// };
+
+// export default TaskBoard;
+
 import React, { useState, useEffect } from "react";
 import { Grid, Box } from "@mui/material";
 import { DragDropContext } from "react-beautiful-dnd";
-import TaskColumn from "./TaskColumn"; // Your existing column component
+import TaskColumn from "./TaskColumn"; 
 import axios from "axios";
 import TaskCard from "./TaskCard";
 import TaskForm from "./TaskForm";
@@ -109,41 +236,48 @@ const TaskBoard = () => {
   const [tasks, setTasks] = useState([]);
   const token = localStorage.getItem("token");
 
-  // Fetch tasks initially
   useEffect(() => {
     axios
       .get("http://localhost:7000/api/tasks", { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => setTasks(res.data))
+      .then((res) => {
+        setTasks(res.data);
+      })
       .catch((err) => console.error("Error fetching tasks:", err));
-  }, []);
+  }, [token]);
 
-  // Safely parse the task description
+  
+
   const safeJSONParse = (string) => {
     try {
       return JSON.parse(string);
     } catch (e) {
       console.error("Invalid JSON string:", string, e);
-      return []; // Return an empty array for invalid JSON
+      return [];
     }
   };
 
-  // Sort tasks into columns based on their completion state
   const sortedTasks = {
     todo: tasks.filter((task) => {
-      const subtasks = safeJSONParse(task.description);
-      return !subtasks.some((subtask) => subtask.completed);
+      // Filter tasks where no subtasks are completed
+      const parsedDescription = safeJSONParse(task.description);
+      return parsedDescription && parsedDescription.every((subtask) => !subtask.completed);
     }),
+    
     inProgress: tasks.filter((task) => {
-      const subtasks = safeJSONParse(task.description);
-      return subtasks.some((subtask) => !subtask.completed);
+      // Filter tasks where some subtasks are completed but not all
+      const parsedDescription = safeJSONParse(task.description);
+      return parsedDescription && parsedDescription.some((subtask) => subtask.completed) && 
+             parsedDescription.some((subtask) => !subtask.completed);
     }),
+    
     done: tasks.filter((task) => {
-      const subtasks = safeJSONParse(task.description);
-      return subtasks.every((subtask) => subtask.completed);
+      // Filter tasks that are marked 'done' and have all subtasks completed
+      const parsedDescription = safeJSONParse(task.description);
+      return task.status === "done" && parsedDescription && parsedDescription.every((subtask) => subtask.completed);
     }),
   };
+  
 
-  // Handle drag end
   const handleDragEnd = async (result) => {
     const { destination, source } = result;
     if (!destination) return;
@@ -154,7 +288,6 @@ const TaskBoard = () => {
     updatedTasks.splice(destination.index, 0, movedTask);
     setTasks(updatedTasks);
 
-    // Determine the new status based on the destination column
     let newStatus;
     if (destination.droppableId === "todo") {
         newStatus = "todo";
@@ -162,18 +295,8 @@ const TaskBoard = () => {
         newStatus = "inProgress";
     } else if (destination.droppableId === "done") {
         newStatus = "done";
-        
-        // Call the new API to move the task to done
-        try {
-            await axios.put(`http://localhost:7000/api/tasks/${movedTask.id}/moveToDone`, {}, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-        } catch (error) {
-            console.error("Error moving task to done:", error);
-        }
     }
 
-    // Update the task status in the backend for other columns
     if (newStatus && newStatus !== "done") {
         try {
             await axios.put(`http://localhost:7000/api/updatetasks/${movedTask.id}`, {
@@ -191,31 +314,25 @@ const TaskBoard = () => {
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-          <TaskForm
-        // newTopic={newTopic}
-        // setNewTopic={setNewTopic}
-        // newSubtasks={newSubtasks}
-        // setNewSubtasks={setNewSubtasks}
-        // addTask={addTask}
-      />
+      <TaskForm />
       <Grid container spacing={3}>
         <TaskColumn
           columnId="todo"
           columnTitle="To Do"
           tasks={sortedTasks.todo}
-          renderTask={(task) => <TaskCard task={task} />}
+          renderTask={(task) => <TaskCard task={task} setTasks={setTasks} />}
         />
         <TaskColumn
           columnId="inProgress"
           columnTitle="In Progress"
           tasks={sortedTasks.inProgress}
-          renderTask={(task) => <TaskCard task={task} />}
+          renderTask={(task) => <TaskCard task={task} setTasks={setTasks} />}
         />
         <TaskColumn
           columnId="done"
           columnTitle="Done"
           tasks={sortedTasks.done}
-          renderTask={(task) => <TaskCard task={task} />}
+          renderTask={(task) => <TaskCard task={task} setTasks={setTasks} />}
         />
       </Grid>
     </DragDropContext>

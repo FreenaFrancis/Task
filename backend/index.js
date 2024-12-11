@@ -128,16 +128,44 @@ app.get('/api/tasks', authenticateToken, async (req, res) => {
 });
 
 // Create Task
-app.post('/api/createtasks', authenticateToken, async (req, res) => {
-    const { title, description } = req.body;
+// app.post('/api/createtasks', authenticateToken, async (req, res) => {
+//     const { title, description } = req.body;
 
-    if (!title || !description) {
-        return res.status(400).json({ message: 'Title and description are required' });
+//     if (!title || !description) {
+//         return res.status(400).json({ message: 'Title and description are required' });
+//     }
+
+//     try {
+//         const task = await prisma.task.create({
+//             data: { title, description, userId: req.user.id },
+//         });
+//         res.status(201).json(task);
+//     } catch (err) {
+//         console.log(err);
+//         res.status(500).json({ message: 'Error creating task', error: err.message });
+//     }
+// });
+
+app.post('/api/createtasks', authenticateToken, async (req, res) => {
+    const { title, description, subtasks } = req.body; // subtasks should be an array of strings
+
+    if (!title || !description || !subtasks) {
+        return res.status(400).json({ message: 'Title, description, and subtasks are required' });
     }
 
     try {
         const task = await prisma.task.create({
-            data: { title, description, userId: req.user.id },
+            data: {
+                title,
+                description,
+                userId: req.user.id,
+                subtasks: {
+                    create: subtasks.map(subtask => ({
+                        content: subtask,
+                        isChecked: false,
+                    })),
+                },
+            },
         });
         res.status(201).json(task);
     } catch (err) {
@@ -145,6 +173,52 @@ app.post('/api/createtasks', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Error creating task', error: err.message });
     }
 });
+
+
+
+app.put('/api/tasks/:id/moveTo', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;  // 'in-progress', 'done', etc.
+
+    if (!['todo', 'in-progress', 'done'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    try {
+        const task = await prisma.task.findUnique({ where: { id: parseInt(id) } });
+        if (!task) {
+            return res.status(404).json({ message: 'Task not found' });
+        }
+
+        const updatedTask = await prisma.task.update({
+            where: { id: parseInt(id) },
+            data: { status },
+        });
+        res.json(updatedTask);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: 'Error updating task status', error: err.message });
+    }
+});
+
+
+
+app.put('/api/subtasks/:id/toggle', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { isChecked } = req.body;
+
+    try {
+        const subtask = await prisma.subtask.update({
+            where: { id: parseInt(id) },
+            data: { isChecked },
+        });
+        res.json(subtask);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Error updating subtask checkbox state', error: err.message });
+    }
+});
+
 
 // Get Task by ID
 app.get('/api/tasksbyid/:id', authenticateToken, async (req, res) => {
@@ -191,6 +265,37 @@ app.put('/api/updatetasks/:id', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Error updating task', error: err.message });
     }
 });
+
+app.put('/api/updatealltask/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { title, description } = req.body;
+  
+    if (!title || !description) {
+      return res.status(400).json({ message: 'Title and description are required' });
+    }
+  
+    try {
+      // Ensure the task exists before updating
+      const task = await prisma.task.findUnique({ where: { id: parseInt(id) } });
+      if (!task) {
+        return res.status(404).json({ message: 'Task not found' });
+      }
+  
+      // Update task with new title and description
+      const updatedTask = await prisma.task.update({
+        where: { id: parseInt(id) },
+        data: {
+          title,
+          description, // Directly update the description (it should be a JSON string)
+        },
+      });
+  
+      res.json(updatedTask); // Return the updated task
+    } catch (err) {
+      console.log(err);
+      res.status(500).json({ message: 'Error updating task', error: err.message });
+    }
+  });
 
 // Delete Task
 // app.delete('/api/deletetasks/:id', authenticateToken, async (req, res) => {
@@ -362,25 +467,72 @@ app.get('/api/tasks/unchecked', authenticateToken, async (req, res) => {
 // Move Task to Done
 app.put('/api/tasks/:id/moveToDone', authenticateToken, async (req, res) => {
     const { id } = req.params;
-
+    const { status } = req.body; // The status to update (todo, in-progress, done)
+  
     try {
-        const task = await prisma.task.findUnique({ where: { id: parseInt(id) } });
-        if (!task) {
-            return res.status(404).json({ message: 'Task not found' });
-        }
-
-        // Update the task's status to "done"
-        const updatedTask = await prisma.task.update({
-            where: { id: parseInt(id) },
-            data: { status: 'done' }, // Set status to "done"
-        });
-        res.json(updatedTask);
+      const task = await prisma.task.findUnique({ where: { id: parseInt(id) } });
+      if (!task) {
+        return res.status(404).json({ message: 'Task not found' });
+      }
+  
+      // Update the task's status based on the given status (todo, in-progress, done)
+      const updatedTask = await prisma.task.update({
+        where: { id: parseInt(id) },
+        data: { status }, // Update task status
+      });
+      res.json(updatedTask);
     } catch (err) {
-        console.log(err);
-        res.status(500).json({ message: 'Error moving task to done', error: err.message });
+      console.log(err);
+      res.status(500).json({ message: 'Error moving task status', error: err.message });
     }
-});
+  });
+  
+  app.put('/api/subtasks/:id/toggle', authenticateToken, async (req, res) => {
+    const { subtaskId } = req.params;  // Use subtaskId from request params
+  const { isChecked } = req.body;    // isChecked status passed in the request body
 
+  try {
+    // Update the subtask's completion state
+    const subtask = await prismaClient.subtask.update({
+      where: { id: parseInt(subtaskId) },  // Update the subtask by its ID
+      data: {
+        isChecked: isChecked,             // Update isChecked field
+        completedAt: isChecked ? new Date() : null,  // Set completedAt when checked
+      },
+    });
+
+    // After updating the subtask, update the task's status
+    await updateTaskStatus(subtask.taskId); // Pass taskId of the updated subtask to check task status
+    
+    return res.status(200).json(subtask);  // Respond with updated subtask
+  } catch (error) {
+    console.error('Error updating subtask:', error);
+    return res.status(500).json({ error: 'Failed to update subtask' });
+  }
+});
+  
+  
+  // Route to fetch task with its subtasks
+  app.get('/api/tasks/:taskId', async (req, res) => {
+    const { taskId } = req.params;
+    
+    try {
+      const task = await prismaClient.task.findUnique({
+        where: { id: parseInt(taskId) },
+        include: { subtasks: true },
+      });
+  
+      if (!task) {
+        return res.status(404).json({ message: 'Task not found' });
+      }
+  
+      return res.json(task);
+    } catch (error) {
+      console.error('Error fetching task:', error);
+      res.status(500).json({ message: 'Error fetching task' });
+    }
+  });
+  
 
 
 
@@ -395,3 +547,4 @@ process.on('SIGINT', async () => {
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
+
